@@ -16,4 +16,5 @@ divf var1
 divr l,s
 fix
 float
-END	FIRST
++lda =x'F1'
+END	COPY

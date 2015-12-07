@@ -56,12 +56,18 @@ typedef struct ST
     int address ;
 } symtable ;
 
+typedef struct LT
+{
+    char *ir_str ;
+    int address ;
+} litertable ;
+
 tvlink *createlink( tvlink*, typevalue*, char* ) ;
 void freelink( tvlink* ) ;
 void bulidoptable( optable*, table* ) ;
 int checkxe( optable*, tvlink* ) ;
-int pass1( optable*, table*, tvlink*, symtable* ) ;
-int pass2( optable*, table*, tvlink*, symtable*, int ) ;
+int pass1( optable*, table*, tvlink*, symtable*, litertable* ) ;
+int pass2( optable*, table*, tvlink*, symtable*,litertable*, int ) ;
 void getTable( char*, table* ) ;
 void freetable( table* ) ;
 tvlink *bulidtable( char*, table*, tvlink* ) ;
@@ -84,6 +90,7 @@ int main()
     tvlink *alink = NULL ;
     table stdtable[ 7 ] ;
     symtable stdsymtable[ MAX_TABLE ] ;
+    litertable stdlitertable[ MAX_TABLE ] ;
     optable stdoptable[ 59 ] ;
     getTable( "Table1.table", &stdtable[ Ins ] ) ;
     getTable( "Table2.table", &stdtable[ Nins ] ) ;
@@ -101,21 +108,24 @@ int main()
         scanf( "%s", fname ) ;
         alink = bulidtable( fname, stdtable, alink ) ;
         xecheck = checkxe( stdoptable, alink ) ;
-        check = pass1( stdoptable, stdtable, alink, stdsymtable ) ;
+        check = pass1( stdoptable, stdtable, alink, stdsymtable, stdlitertable ) ;
         if( check == TRUE )
         {
-            check = pass2( stdoptable, stdtable, alink, stdsymtable, xecheck ) ;
+            check = pass2( stdoptable, stdtable, alink, stdsymtable, stdlitertable, xecheck ) ;
             for( i = 0 ; stdsymtable[ i ].address != FIN ; i++ )
                 printf( "%s %x\n",stdsymtable[ i ].sym, stdsymtable[ i ].address ) ;
             i = 0 ;
-            while( alink->next != NULL )
+            while( alink != NULL )
             {
                 if( alink->cdtv[ 0 ].set != FIN )
                 {
                     printf( "%d %04x\t%s\t\t%s\n", i, alink->loc, alink->code, alink->mcode ) ;
                     i++ ;
                 }
-                alink = alink->next ;
+                if( alink->next != NULL )
+                    alink = alink->next ;
+                else
+                    break ;
             }
         }
         else
@@ -402,6 +412,7 @@ void cutss( typevalue *cdtv, table *stdtable, char *token, int *count )
         cuttoken( token, stdtable, cdtv, count ) ;
     }
 }
+
 void cutsi( typevalue *cdtv, table *stdtable, char *token, int *count )
 {
     int i ;
@@ -546,9 +557,9 @@ int checkxe( optable *aoptable, tvlink *alink )
     return FALSE ;
 }
 
-int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtable )
+int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtable, litertable *alitertable )
 {
-    int i, loc = 0, symc = 0, count = 0 ;
+    int i, loc = 0, symc = 0, count = 0, litc = 0, litcur = 0 ;
     int x, j, check, buf ;
     char buffer[ MAX_LEN ] ;
     while( alink != NULL )
@@ -563,7 +574,6 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                 {
                     if( alink->cdtv[ i ].set  == IR )
                     {
-
                         sscanf( stdtable[ IR ].command[ alink->cdtv[ i ].subset ], "%x", &alink->loc ) ;
                         loc = alink->loc ;
                         if( alink->cdtv[ i - 2 ].set == Sym && i >= 2 )
@@ -582,8 +592,16 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                 {
                     if( alink->cdtv[ i ].set == Sym )
                     {
-                        if( ( strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], asymtable[ 0 ].sym ) ) == 0 )
-                            alink->loc = FIN ;
+                        alink->loc = loc ;
+                        for( j = litcur ; j < litc ; j++ )
+                        {
+                            alitertable[ j ].address = loc ;
+                            asymtable[ symc ].sym = alitertable[ j ].ir_str ;
+                            asymtable[ symc ].address = loc ;
+                            symc++ ;
+                            loc += WORD ;
+                        }
+                        litcur = litc ;
                     }
                     else
                         return FALSE ;
@@ -727,44 +745,74 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                     else
                         return FALSE ;
                 }
-                else if( alink->cdtv[ i ].set == Del && ( alink->cdtv[ i ].subset == 11 || alink->cdtv[ i ].subset == 12 ) )
+                else if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset >= 10 && alink->cdtv[ i ].subset <= 12 )
                 {
-                    printf("sdgshsghs") ;
                     i++ ;
-                    if( alink->cdtv[ i ].set != Sym )
+                    if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset == DH )
+                    {
+                        i++ ;
+                        if( alink->cdtv[ i ].set == Str || alink->cdtv[ i ].set == IR )
+                        {
+                            for( j = 0 ; j < litc ; j++ )
+                                if( alitertable[ j ].ir_str == stdtable[ alink->cdtv[ i ].set ].command[ alink->cdtv[ i ].subset ] )
+                                    break ;
+                            if( j == litc )
+                            {
+                                alitertable[ litc ].ir_str = stdtable[ alink->cdtv[ i ].set ].command[ alink->cdtv[ i ].subset ] ;
+                                litc++ ;
+                            }
+                            i++ ;
+                        }
+                    }
+                    else if( alink->cdtv[ i ].set != Sym )
                         return FALSE ;
                 }
                 else
                     return FALSE ;
             }
-            else if( alink->cdtv[ i ].set == Sym && strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "EQU" ) == 0 )
+            else if( alink->cdtv[ i ].set == Sym )
             {
-                i++ ;
-                if( alink->cdtv[ i - 2 ].set == Sym && i >= 2 )
+                if( strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "EQU" ) == 0 )
                 {
-                    asymtable[ symc ].sym = stdtable[ Sym ].command[ alink->cdtv[ i - 2 ].subset ] ;
-                    if( alink->cdtv[ i ].set == IR )
+                    i++ ;
+                    if( alink->cdtv[ i - 2 ].set == Sym && i >= 2 )
                     {
-                        sscanf( stdtable[ IR ].command[ alink->cdtv[ i ].subset ], "%d", &asymtable[ symc ].address ) ;
-                        alink->loc = asymtable[ symc ].address ;
+                        asymtable[ symc ].sym = stdtable[ Sym ].command[ alink->cdtv[ i - 2 ].subset ] ;
+                        if( alink->cdtv[ i ].set == IR )
+                        {
+                            sscanf( stdtable[ IR ].command[ alink->cdtv[ i ].subset ], "%d", &asymtable[ symc ].address ) ;
+                            alink->loc = asymtable[ symc ].address ;
+                        }
+                        symc++ ;
+                        for( j = 0 ; j < symc - 1 ; j++ )
+                        {
+                            if( asymtable[ j ].sym == asymtable[ symc - 1 ].sym )
+                                return FALSE ;
+                        }
                     }
-                    symc++ ;
-                    for( j = 0 ; j < symc - 1 ; j++ )
-                    {
-                        if( asymtable[ j ].sym == asymtable[ symc - 1 ].sym )
-                            return FALSE ;
-                    }
+                    else
+                        return FALSE ;
                 }
-                else
-                    return FALSE ;
-            }
-            else if( alink->cdtv[ i ].set == Sym && strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "BASE" ) == 0 )
-            {
-                i++ ;
-                if( alink->cdtv[ i - 2 ].set == Sym && i >= 2 )
-                    return FALSE ;
-                if( alink->cdtv[ i ].set != Sym )
-                    return FALSE ;
+                else if( strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "BASE" ) == 0 )
+                {
+                    i++ ;
+                    if( alink->cdtv[ i - 2 ].set == Sym && i >= 2 )
+                        return FALSE ;
+                    if( alink->cdtv[ i ].set != Sym )
+                        return FALSE ;
+                }
+                else if( strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "LTORG" ) == 0 )
+                {
+                    for( j = litcur ; j < litc ; j++ )
+                    {
+                        alitertable[ j ].address = loc ;
+                        asymtable[ symc ].sym = alitertable[ j ].ir_str ;
+                        asymtable[ symc ].address = loc ;
+                        symc++ ;
+                        loc += WORD ;
+                    }
+                    litcur = litc ;
+                }
             }
         }
         if( alink->next != NULL )
@@ -772,7 +820,9 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
         else
             break ;
     }
+    printf("%s %x", asymtable[ symc - 1 ].sym ,asymtable[ symc - 1 ].address ) ;
     asymtable[ symc ].address = FIN ;
+    alitertable[ litc ].address = FIN ;
     if( alink != NULL )
         return TRUE ;
 }
@@ -829,7 +879,7 @@ int format2check( tvlink *alink, int *loc )
     }
 }
 
-int pass2( optable *aoptable, table *atable, tvlink *alink, symtable *asymtable, int check )
+int pass2( optable *aoptable, table *atable, tvlink *alink, symtable *asymtable, litertable *alitertable, int check )
 {
     int i, j, opc ;
     int pc = 0 , direct, address, breg = FIN ;
@@ -933,6 +983,8 @@ int pass2( optable *aoptable, table *atable, tvlink *alink, symtable *asymtable,
                                     opc += 1 ;
                                 if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset == 12 )
                                     opc += 2 ;
+                                if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset == 10 )
+                                    opc += 3 ;
                                 i++ ;
                                 format4( atable, asymtable, alink, opc, &i ) ;
                             }
@@ -951,6 +1003,8 @@ int pass2( optable *aoptable, table *atable, tvlink *alink, symtable *asymtable,
                                     opc += 1 ;
                                 if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset == 12 )
                                     opc += 2 ;
+                                if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset == 10 )
+                                    opc += 3 ;
                                 i++ ;
                                 format3( atable, asymtable, alink, opc, &i, pc, breg ) ;
                             }
@@ -987,8 +1041,8 @@ int format4( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i 
     int address, flag = 0 ;
     int index = 8, base = 4, prog = 2, format = 1 ;
     char reg_adr[ MAX_LEN ], sflag[ MAX_LEN ] ;
-    sprintf( alink->mcode, "%x", opc ) ;
-    printf( "==%s %s\n", alink->code, alink->mcode ) ;
+    sprintf( alink->mcode, "%02x", opc ) ;
+    flag += format ;
     if( alink->cdtv[ *i ].set == Sym )
     {
         for( j = 0 ; asymtable[ j ].address != FIN ; j++ )
@@ -1003,7 +1057,6 @@ int format4( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i 
         }
         if( address == FIN )
             return FALSE ;
-        flag += format ;
         ( *i )++ ;
         if( alink->cdtv[ *i ].set == Del && alink->cdtv[ *i ].subset == 0 )
         {
@@ -1029,6 +1082,29 @@ int format4( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i 
         sprintf( reg_adr, "%04x", address ) ;
         strcat( alink->mcode, reg_adr ) ;
     }
+    else if( alink->cdtv[ *i ].set == Del && alink->cdtv[ *i ].subset == DH )
+    {
+        ( *i )++ ;
+        for( j = 0 ; asymtable[ j ].address != FIN ; j++ )
+        {
+            if( atable[ alink->cdtv[ *i ].set ].command[ alink->cdtv[ *i ].subset ] == asymtable[ j ].sym )
+            {
+                address = asymtable[ j ].address ;
+                break ;
+            }
+        }
+        ( *i )++ ;
+        if( alink->cdtv[ *i ].set == Del && alink->cdtv[ *i ].subset == 0 )
+            return FALSE ;
+        else
+            ( *i )-- ;
+        sprintf( sflag, "%x", flag ) ;
+        strcat( alink->mcode, sflag ) ;
+        strcat( alink->mcode, "0" ) ;
+        sprintf( reg_adr, "%04x", address ) ;
+        strcat( alink->mcode, reg_adr ) ;
+
+    }
     return TRUE ;
 }
 
@@ -1038,7 +1114,7 @@ int format3( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i,
     int address, flag = 0, disp ;
     int index = 8, base = 4, prog = 2, format = 1 ;
     char reg_adr[ MAX_LEN ], sflag[ MAX_LEN ] ;
-    sprintf( alink->mcode, "%x", opc ) ;
+    sprintf( alink->mcode, "%02x", opc ) ;
     if( alink->cdtv[ *i ].set == Sym )
     {
         for( j = 0 ; asymtable[ j ].address != FIN ; j++ )
@@ -1077,7 +1153,7 @@ int format3( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i,
                 ( *i )-- ;
             sprintf( sflag, "%d", flag ) ;
             strcat( alink->mcode, sflag ) ;
-            sprintf( reg_adr, "%x", disp ) ;
+            sprintf( reg_adr, "%03x", disp ) ;
             strcat( alink->mcode, reg_adr ) ;
         }
     }
@@ -1094,5 +1170,42 @@ int format3( table *atable, symtable *asymtable, tvlink *alink, int opc, int *i,
         strcat( alink->mcode, sflag ) ;
         sprintf( reg_adr, "%03x", disp ) ;
         strcat( alink->mcode, reg_adr ) ;
+    }
+    else if( alink->cdtv[ *i ].set == Del && alink->cdtv[ *i ].subset == DH )
+    {
+        ( *i )++ ;
+        for( j = 0 ; asymtable[ j ].address != FIN ; j++ )
+        {
+            if( atable[ alink->cdtv[ *i ].set ].command[ alink->cdtv[ *i ].subset ] == asymtable[ j ].sym )
+            {
+                address = asymtable[ j ].address ;
+                break ;
+            }
+        }
+        ( *i )++ ;
+        flag += prog ;
+        disp = address - pc ;
+        if( disp < 0 )
+            disp += 4096 ;
+        if( disp < 0 )
+        {
+            flag -= prog ;
+            if( breg == FIN )
+                return FALSE ;
+            else
+            {
+                flag += base ;
+                disp = address - base ;
+            }
+        }
+        if( alink->cdtv[ *i ].set == Del && alink->cdtv[ *i ].subset == 0 )
+            return FALSE ;
+        else
+            ( *i )-- ;
+        sprintf( sflag, "%d", flag ) ;
+        strcat( alink->mcode, sflag ) ;
+        sprintf( reg_adr, "%03x", disp ) ;
+        strcat( alink->mcode, reg_adr ) ;
+        printf( "%x\n", address ) ;
     }
 }
