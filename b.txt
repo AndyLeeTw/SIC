@@ -7,9 +7,9 @@ add #var1
 addr a,b
 +and @var1
 clear b
-comp 0
+comp #21
 +compf var3
-compr b,a
+de compr b,a
 .this is comment
 div var1
 divf var1
