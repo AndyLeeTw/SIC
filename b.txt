@@ -1,7 +1,8 @@
 COPY    START 0
-	var1	RESW	1
-	var2	RESB	12
-	var3  EQU  12
+var1	RESW	1
+var2	RESB	12
+var3  EQU  12
+var4 EQU var3 + var2
 add #var1
 +addf var2
 addr a,b
@@ -11,6 +12,7 @@ comp #21
 +compf var3
 de compr b,a
 .this is comment
+var5 EQU var4
 div var1
 divf var1
 divr l,s

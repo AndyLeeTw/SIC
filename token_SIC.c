@@ -123,7 +123,7 @@ int main()
             check = pass2( stdoptable, stdtable, alink, stdsymtable, stdlitertable, xecheck ) ;
             outputfile( alink, fname ) ;
         }
-        else if( check !=FALSE )
+        else if( check != FALSE )
             printf("%d row syntax error\n", check ) ;
     }
     for( i = 0 ; i < 7 ; i++ )
@@ -872,44 +872,47 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                                 asymtable[ symc ].sym = stdtable[ Sym ].command[ alink->cdtv[ i - 2 ].subset ] ;
                                 sscanf( stdtable[ IR ].command[ alink->cdtv[ i ].subset ], "%d", &asymtable[ symc ].address ) ;
                                 alink->loc = asymtable[ symc ].address ;
+                                symc++ ;
+                                i++ ;
                             }
                         }
                         if( alink->cdtv[ i ].set == Sym )
                         {
                             i++ ;
-                            if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset >= 1 && alink->cdtv[ i ].subset <= 4 )
+                            for( ; alink->cdtv[ i ].set != FIN ; i++ )
                             {
-                                for( j = i ; alink->cdtv[ j ].set != FIN ; j++ )
+                                if( alink->cdtv[ i ].set == Del && alink->cdtv[ i ].subset >= 1 && alink->cdtv[ i ].subset <= 4 )
                                 {
-                                    if( alink->cdtv[ j ].set == Del && alink->cdtv[ j ].subset >= 1 && alink->cdtv[ j ].subset <= 4 )
-                                    {
-                                        j++ ;
-                                        if( alink->cdtv[ j ].set != Sym )
-                                            return alink->row ;
-                                    }
+                                    i++ ;
+                                    if( alink->cdtv[ i ].set != Sym )
+                                        return alink->row ;
                                 }
-
+                                else
+                                {
+                                    return alink->row ;
+                                }
                             }
-                            else if( alink->cdtv[ i ].set == FIN )
-                                i-- ;
-                            else
-                                return alink->row ;
                             aequtable.done[ aequtable.size ] = UNDO ;
                             aequtable.link[ aequtable.size ] = alink ;
                             aequtable.size++ ;
                         }
-                        symc++ ;
-                        for( j = 0 ; j < symc - 1 ; j++ )
+                        if( alink->cdtv[ i ].set == FIN )
+                            i-- ;
+                        else
                         {
-                            if( asymtable[ j ].sym == asymtable[ symc - 1 ].sym )
-                            {
-                                printf( "%d row duplicate symbol", alink->row ) ;
-                                return FALSE ;
-                            }
+                            return alink->row ;
                         }
                     }
                     else
                         return alink->row ;
+                    for( j = 0 ; j < symc - 1 ; j++ )
+                    {
+                        if( asymtable[ j ].sym == asymtable[ symc - 1 ].sym )
+                        {
+                            printf( "%d row duplicate symbol", alink->row ) ;
+                            return FALSE ;
+                        }
+                    }
                 }
                 else if( strcmp( stdtable[ Sym ].command[ alink->cdtv[ i ].subset ], "BASE" ) == 0 )
                 {
@@ -946,46 +949,95 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
 
 int equ( equtable *aequtable , symtable *asymtable, table *atable, int *symc )
 {
-    int i, ctc, k ;
-    for( i = 0 ; i < aequtable->size ; i++ )
+    int i, ctc, k, done = 0, checkdo, address ;
+    while( done != aequtable->size )
     {
-        if( aequtable->done[ i ] == UNDO )
+        for( i = 0 ; i < aequtable->size ; i++ )
         {
-            for( ctc = 0 ; aequtable->link[ i ]->cdtv[ ctc ].set != FIN ; ctc++ )
+            address = UNDO ;
+            if( aequtable->done[ i ] == UNDO )
             {
-                if( strcmp( atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc ].subset ], "EQU" ) == 0 )
+                for( ctc = 2 ; aequtable->link[ i ]->cdtv[ ctc ].set != FIN ; ctc++ )
                 {
-                    i++ ;
-                    for( k = 0 ; k < *symc ; k++ )
+                    if( ctc == 2 && aequtable->link[ i ]->cdtv[ ctc + 1 ].set == FIN )
                     {
-                        if( atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc ].subset ] == asymtable[ k ].sym )
+                        for( k = 0 ; k < *symc ; k++ )
                         {
-                            asymtable[ *symc ].sym = atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc - 2 ].subset ] ;
-                            asymtable[ *symc ].address = asymtable[ k ].address ;
-                            aequtable->link[ i ]->loc = asymtable[ *symc ].address ;
-                            aequtable->done[ i ] = DO ;
-                            ( *symc )++ ;
+                            if( atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc ].subset ] == asymtable[ k ].sym )
+                            {
+                                checkendusym( asymtable, symc, atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc - 2 ].subset ], asymtable[ k ].address ) ;
+                                printf( "%x\n",asymtable[ k ].address ) ;
+                                aequtable->link[ i ]->loc = asymtable[ k ].address ;
+                                aequtable->done[ i ] = DO ;
+                                break ;
+                            }
                         }
+                    }
+                    else if( ctc == 2 )
+                    {
+                        for( k = 0 ; k < *symc ; k++ )
+                        {
+                            if( atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc ].subset ] == asymtable[ k ].sym )
+                            {
+                                address = asymtable[ k ].address ;
+                                break ;
+                            }
+                        }
+                        if( address == UNDO )
+                            break ;
+                    }
+                    else
+                    {
+                        ctc++ ;
+                        for( k = 0 ; k < *symc ; k++ )
+                        {
+                            if( atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ ctc ].subset ] == asymtable[ k ].sym )
+                                break ;
+                        }
+                        if( address == UNDO )
+                            break ;
+                        switch( aequtable->link[ i ]->cdtv[ ctc - 1 ].subset )
+                        {
+                            case 1:
+                                address += asymtable[ k ].address ;
+                                break ;
+                            case 2:
+                                address -= asymtable[ k ].address ;
+                                break ;
+                            case 3:
+                                address *= asymtable[ k ].address ;
+                                break ;
+                            case 4:
+                                address /= asymtable[ k ].address ;
+                                break ;
+                        }
+                    }
+                    if( aequtable->link[ i ]->cdtv[ ctc + 1 ].set == FIN )
+                    {
+                        checkendusym( asymtable, symc, atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ 0 ].subset ], address ) ;
+                        aequtable->link[ i ]->loc = asymtable[ k ].address ;
+                        aequtable->done[ i ] = DO ;
+                        break ;
                     }
                 }
             }
         }
-    }
-    for( i = 0 ; i < aequtable->size ; i++ )
-    {
-        if( aequtable->done[ i ] == DO )
+        for( i = checkdo =  0 ; i < aequtable->size ; i++ )
         {
-            aequtable->done[ i ] = NONE ;
-            break ;
+            if( aequtable->done[ i ] == DO )
+            {
+                checkdo++ ;
+            }
         }
+        printf("%d",checkdo ) ;
+        if( checkdo <= done )
+        {
+            printf( "EQU fail.\n" ) ;
+            return FALSE ;
+        }
+        else
+            done = checkdo ;
     }
-    if( aequtable->done[ i ] == UNDO )
-    {
-        printf( "EQU fail.\n" ) ;
-        return FALSE ;
-    }
-    else
-        equ( aequtable, asymtable, atable, symc ) ;
 }
 
 int BWcount( int count, int *loc, symtable *asymtable, int BW, tvlink *alink, table *stdtable, int *symc )
@@ -1001,7 +1053,10 @@ int BWcount( int count, int *loc, symtable *asymtable, int BW, tvlink *alink, ta
         }
         if( alink->cdtv[ count - 2 ].set == Sym )
             if( checkendusym( asymtable, symc, stdtable[ Sym ].command[ alink->cdtv[ count - 2 ].subset ], *loc ) == FALSE )
+            {
+                printf( "%d row duplicate symbol.\n", alink->row ) ;
                 return FALSE ;
+            }
     }
     *loc += BW ;
     return TRUE ;
@@ -1013,10 +1068,7 @@ int checkendusym( symtable *asymtable, int *symc, char *sym, int loc )
     for( i = 0 ; i < *symc ; i++ )
     {
         if( asymtable[ i ].sym == asymtable[ *symc ].sym )
-        {
-            printf( "%d row duplicate symbol.\n" ) ;
             return FALSE ;
-        }
     }
     asymtable[ *symc ].sym = sym ;
     asymtable[ *symc ].address = loc ;
