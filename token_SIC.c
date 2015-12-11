@@ -83,14 +83,13 @@ void cutss( typevalue*, table*, char*, int* ) ;
 void cutsi( typevalue*, table*, char*, int* ) ;
 void initializetable( table*, int ) ;
 void enarray( typevalue*, int, int, int* ) ;
-int Calculate() ;
 int hash( char*, table* ) ;
 int BWcount( int, int*, symtable*, int, tvlink*, table*, int* ) ;
 int format2check( tvlink*, int* ) ;
 int format3( table*, symtable*, tvlink*, int, int*, int, int ) ;
 int format4( table*, symtable*, tvlink*, int, int* ) ;
 int checkendusym( symtable*, int*, char*, int ) ;
-void outputfile( tvlink*, char* ) ;
+void outputfile( tvlink*, char*, table* ) ;
 int equ( equtable*, symtable*, table*, int* ) ;
 
 int main()
@@ -121,7 +120,7 @@ int main()
         if( check == TRUE )
         {
             check = pass2( stdoptable, stdtable, alink, stdsymtable, stdlitertable, xecheck ) ;
-            outputfile( alink, fname ) ;
+            outputfile( alink, fname, stdtable ) ;
         }
         else if( check != FALSE )
             printf("%d row syntax error\n", check ) ;
@@ -298,7 +297,7 @@ tvlink *bulidtable( char *fname, table *stdtable, tvlink *alink )
     return alink ;
 }
 
-void outputfile( tvlink *alink, char *fname )
+void outputfile( tvlink *alink, char *fname, table *atable )
 {
     FILE *outfile ;
     char outfname[ MAX_ROW ] = "output_" ;
@@ -309,17 +308,27 @@ void outputfile( tvlink *alink, char *fname )
         fprintf( outfile, "Line\tLoc\tSource statement\t\tObject code\n" ) ;
         while( alink != NULL )
         {
-            if( alink->cdtv[ 0 ].set == Nins && alink->cdtv[ 0 ].subset == 1 )
-                fprintf( outfile, "%03d\t\t%-20s\t\t%s\n", alink->row, alink->code, alink->mcode ) ;
-            else if( alink->cdtv[ 0 ].set != FIN )
-                fprintf( outfile, "%03d\t%04x\t%-20s\t\t%s\n", alink->row, alink->loc, alink->code, alink->mcode ) ;
+
+            if( alink->cdtv[ 0 ].set != FIN )
+            {
+                if( strcmp( atable[ alink->cdtv[ 0 ].set ].command[ alink->cdtv[ 0 ].subset ], "LTORG" ) == 0 || strcmp( atable[ alink->cdtv[ 0 ].set ].command[ alink->cdtv[ 0 ].subset ], "BASE" ) == 0 )
+                    fprintf( outfile, "%03d\t\t%-20s\n", alink->row, alink->code ) ;
+                else if( alink->cdtv[ 0 ].set == Nins && alink->cdtv[ 0 ].subset == 1 )
+                    fprintf( outfile, "%03d\t\t%-20s\t\t%s\n", alink->row, alink->code, alink->mcode ) ;
+                else
+                    fprintf( outfile, "%03d\t%04x\t%-20s\t\t%s\n", alink->row, alink->loc, alink->code, alink->mcode ) ;
+            }
             else
                 fprintf( outfile, "%03d\t%-20s\n", alink->row, alink->code ) ;
-
-            if( alink->cdtv[ 0 ].set == Nins && alink->cdtv[ 0 ].subset == 1 )
-                printf( "%03d\t\t%-20s\t\t%s\n", alink->row, alink->code, alink->mcode ) ;
-            else if( alink->cdtv[ 0 ].set != FIN )
+            if( alink->cdtv[ 0 ].set != FIN )
+            {
+                if( alink->cdtv[ 0 ].set == Nins && alink->cdtv[ 0 ].subset == 1  )
+                    printf( "%03d\t\t%-20s\n", alink->row, alink->code ) ;
+                else if( strcmp( atable[ alink->cdtv[ 0 ].set ].command[ alink->cdtv[ 0 ].subset ], "LTORG" ) == 0 || strcmp( atable[ alink->cdtv[ 0 ].set ].command[ alink->cdtv[ 0 ].subset ], "BASE" ) == 0 )
+                    printf( "%03d\t\t%-20s\n", alink->row, alink->code ) ;
+                else
                 printf( "%03d\t%04x\t%-20s\t\t%s\n", alink->row, alink->loc, alink->code, alink->mcode ) ;
+            }
             else
                 printf( "%03d\t%-20s\n", alink->row, alink->code ) ;
             if( alink->next != NULL )
@@ -729,6 +738,10 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                 }
                 else
                     return alink->row ;
+                if( alink->cdtv[ i + 1 ].set == FIN )
+                    break ;
+                else
+                    return alink->row ;
             }
             else if( alink->cdtv[ i ].set == Ins )
             {
@@ -848,6 +861,13 @@ int pass1( optable *aoptable, table *stdtable, tvlink *alink, symtable *asymtabl
                 }
                 else
                     return alink->row ;
+                if( alink->cdtv[ i + 1 ].set == FIN )
+                    break ;
+                else
+                {
+                    printf( "%d %s", i, alink->code );
+                    return alink->row ;
+                }
             }
             else if( alink->cdtv[ i ].set == Sym )
             {
@@ -972,6 +992,7 @@ int equ( equtable *aequtable , symtable *asymtable, table *atable, int *symc )
                                 break ;
                             }
                         }
+                        break ;
                     }
                     else if( ctc == 2 )
                     {
@@ -1015,7 +1036,7 @@ int equ( equtable *aequtable , symtable *asymtable, table *atable, int *symc )
                     if( aequtable->link[ i ]->cdtv[ ctc + 1 ].set == FIN )
                     {
                         checkendusym( asymtable, symc, atable[ Sym ].command[ aequtable->link[ i ]->cdtv[ 0 ].subset ], address ) ;
-                        aequtable->link[ i ]->loc = asymtable[ k ].address ;
+                        aequtable->link[ i ]->loc = address ;
                         aequtable->done[ i ] = DO ;
                         break ;
                     }
@@ -1080,7 +1101,8 @@ int format2check( tvlink *alink, int *loc )
 {
     if( alink->cdtv[ *loc - 1 ].subset == 4 || alink->cdtv[ *loc - 1 ].subset == 53 || alink->cdtv[ *loc - 1 ].subset == 57 )
     {
-        if( alink->cdtv[ *loc + 1 ].set == FIN )
+        ( *loc )++ ;
+        if( alink->cdtv[ *loc ].set == FIN )
         {
             ( *loc )-- ;
             return TRUE ;
@@ -1098,7 +1120,8 @@ int format2check( tvlink *alink, int *loc )
                 ( *loc )++ ;
                 if( alink->cdtv[ *loc ].set == Reg )
                 {
-                    if( alink->cdtv[ *loc + 1 ].set == FIN )
+                    ( *loc )++ ;
+                    if( alink->cdtv[ *loc ].set == FIN )
                     {
                         ( *loc )-- ;
                         return TRUE ;

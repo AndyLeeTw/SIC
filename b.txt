@@ -3,6 +3,7 @@ var1	RESW	1
 var2	RESB	12
 var3  EQU  12
 var4 EQU var3 + var2
+base var3
 add #var1
 +addf var2
 addr a,b
@@ -10,6 +11,7 @@ addr a,b
 clear b
 comp #21
 +compf var3
+ltorg
 de compr b,a
 .this is comment
 var5 EQU var4
